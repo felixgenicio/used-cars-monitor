@@ -375,19 +375,24 @@ async def scrape(target_url: str, debug_dir: str | None = None) -> list[dict]:
         except Exception as exc:
             logger.warning(f"Page load warning (continuing): {exc}")
 
-        # Scroll through the page in steps to trigger lazy loading of all cards
-        logger.info("Scrolling page to trigger lazy loading...")
-        scroll_height = await page.evaluate("document.body.scrollHeight")
-        steps = 10
-        for i in range(1, steps + 1):
-            await page.evaluate(f"window.scrollTo(0, {scroll_height * i // steps})")
-            await asyncio.sleep(0.8)
+        # Extra wait for JS to finish initializing after networkidle
+        await asyncio.sleep(3)
 
-        # Scroll back to top then to bottom once more
-        await page.evaluate("window.scrollTo(0, 0)")
-        await asyncio.sleep(1)
-        await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-        await asyncio.sleep(2)
+        # Scroll in viewport-sized steps; re-check page height each time
+        # because lazy-loaded content can make the page grow dynamically.
+        logger.info("Scrolling page to trigger lazy loading...")
+        viewport_h = 900
+        position = 0
+        for _ in range(60):  # up to 60 steps (~54 000 px max)
+            position += viewport_h
+            await page.evaluate(f"window.scrollTo(0, {position})")
+            await asyncio.sleep(1.5)
+            page_height = await page.evaluate("document.body.scrollHeight")
+            if position >= page_height:
+                break
+
+        # Final wait for any remaining content to render
+        await asyncio.sleep(3)
 
         # Save debug dump if requested
         if debug_dir:
