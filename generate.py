@@ -6,6 +6,7 @@ Reads all car data from the database and renders a Jinja2 template.
 import os
 import logging
 from datetime import datetime, timezone
+from urllib.parse import urlparse
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
@@ -50,7 +51,7 @@ def _price_delta(history: list[dict]) -> str:
     return f"{sign}{delta:,.0f} €".replace(",", ".")
 
 
-def generate(output_dir: str | None = None):
+def generate(output_dir: str | None = None, rerate: bool = False):
     output_dir = output_dir or os.getenv("OUTPUT_DIR", "./output")
     os.makedirs(output_dir, exist_ok=True)
 
@@ -58,7 +59,12 @@ def generate(output_dir: str | None = None):
     stats = db.get_stats()
 
     # AI rating (skipped if OPENAI_API_KEY is not set)
-    rate_cars_if_needed(cars)
+    rate_cars_if_needed(cars, force=rerate)
+
+    # Base URL for building absolute links
+    target_url = os.getenv("TARGET_URL", "")
+    parsed = urlparse(target_url)
+    base_url = f"{parsed.scheme}://{parsed.netloc}" if parsed.netloc else ""
 
     # Enrich cars with display helpers
     for car in cars:
@@ -67,6 +73,11 @@ def generate(output_dir: str | None = None):
         car["display_first_seen"] = _format_dt(car.get("first_seen"))
         car["display_last_seen"] = _format_dt(car.get("last_seen"))
         car["price_delta"] = _price_delta(car.get("price_history", []))
+        # Make car URL absolute
+        url = car.get("url", "")
+        if url and not url.startswith("http") and base_url:
+            car["url"] = base_url + ("" if url.startswith("/") else "/") + url
+
         car["title"] = " ".join(
             filter(None, [car.get("brand"), car.get("model")])
         ) or "Vehículo sin nombre"

@@ -36,7 +36,7 @@ def rate_car(car: dict) -> tuple[str | None, str | None]:
     prompt = (
         "Eres un experto en el mercado de coches de segunda mano en España. "
         "Analiza el siguiente anuncio y valora si el precio es bueno, normal o caro para el comprador, "
-        "comparando con el mercado actual.\n\n"
+        "comparando con el mercado actual. Compara con precios reales actuales.\n\n"
         f"Marca/Modelo: {car.get('brand', '')} {car.get('model', '')}\n"
         f"Año: {car.get('year', 'desconocido')}\n"
         f"Kilómetros: {car.get('km', 'desconocido')}\n"
@@ -53,12 +53,16 @@ def rate_car(car: dict) -> tuple[str | None, str | None]:
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-mini",
+            model="gpt-4o-search-preview",
             messages=[{"role": "user", "content": prompt}],
-            response_format={"type": "json_object"},
-            temperature=0.3,
         )
-        data = json.loads(response.choices[0].message.content)
+        content = response.choices[0].message.content
+        # Extract JSON block from the response (model may wrap it in markdown)
+        import re
+        json_match = re.search(r'\{[^{}]+\}', content, re.DOTALL)
+        if not json_match:
+            raise ValueError(f"No JSON found in response: {content!r}")
+        data = json.loads(json_match.group())
         rating = data.get("rating", "yellow")
         justification = data.get("justification", "")
 
@@ -72,10 +76,11 @@ def rate_car(car: dict) -> tuple[str | None, str | None]:
         return None, None
 
 
-def rate_cars_if_needed(cars: list[dict]) -> None:
+def rate_cars_if_needed(cars: list[dict], force: bool = False) -> None:
     """
     For each car that lacks a rating or whose price has changed since the last rating,
     call rate_car() and persist the result to the DB.
+    Pass force=True to re-rate all cars regardless of cached values.
     Modifies car dicts in-place so the template sees updated values.
     """
     import db
@@ -84,7 +89,7 @@ def rate_cars_if_needed(cars: list[dict]) -> None:
         current_price = car.get("current_price")
         rated_price = car.get("ai_rated_price")
 
-        needs_rating = (
+        needs_rating = force or (
             car.get("ai_rating") is None
             or (current_price is not None and current_price != rated_price)
         )

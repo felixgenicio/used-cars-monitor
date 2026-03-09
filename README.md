@@ -7,7 +7,7 @@ Herramienta que rastrea anuncios de coches de segunda mano y genera una página 
 - Scraping con Playwright (soporta páginas JavaScript/Next.js)
 - Historial de precios por vehículo
 - Registro de cuándo apareció y desapareció cada anuncio
-- Valoración IA del precio (verde/amarillo/rojo) con justificación vía OpenAI
+- Valoración IA del precio (verde/amarillo/rojo) con justificación vía OpenAI (`gpt-4o-search-preview`, con búsqueda de precios reales actuales)
 - Página HTML estática con filtros y ordenación
 - Cron job (3 veces al día)
 
@@ -47,6 +47,9 @@ venv/bin/python run.py
 
 # Solo regenerar la página HTML sin hacer scraping
 venv/bin/python run.py --generate
+
+# Forzar re-valoración IA de todos los coches (ignora la caché)
+venv/bin/python run.py --generate --rerate
 ```
 
 La página generada se guarda en `output/index.html`.

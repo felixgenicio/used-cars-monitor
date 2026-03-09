@@ -45,12 +45,14 @@ def main():
                         help="Dump captured API responses to logs/ for inspection")
     parser.add_argument("--generate", action="store_true",
                         help="Only regenerate HTML page, skip scraping")
+    parser.add_argument("--rerate", action="store_true",
+                        help="Force re-running AI ratings for all cars, ignoring cache")
     args = parser.parse_args()
 
     if args.generate:
         logger.info("Regenerating HTML page (no scraping)")
         from generate import generate
-        output = generate()
+        output = generate(rerate=args.rerate)
         logger.info(f"Done. Page at: {output}")
         return
 
@@ -85,7 +87,7 @@ def main():
 
     # Generate HTML
     from generate import generate
-    output = generate()
+    output = generate(rerate=args.rerate)
     logger.info(f"Page generated: {output}")
     logger.info("=== Run complete ===")
 
