@@ -224,6 +224,46 @@
     }
     .car-link:hover { text-decoration: underline; }
 
+    /* ---- AI rating badge ---- */
+    .ai-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 0;
+      border: 2px solid transparent;
+      transition: transform 0.1s;
+    }
+    .ai-badge:hover { transform: scale(1.15); }
+    .ai-badge.ai-green  { background: rgba(34,197,94,0.2);  border-color: var(--green); }
+    .ai-badge.ai-yellow { background: rgba(245,158,11,0.2); border-color: var(--yellow); }
+    .ai-badge.ai-red    { background: rgba(239,68,68,0.2);  border-color: var(--red); }
+    .ai-badge.ai-green::before  { content: '●'; color: var(--green);  font-size: 1rem; }
+    .ai-badge.ai-yellow::before { content: '●'; color: var(--yellow); font-size: 1rem; }
+    .ai-badge.ai-red::before    { content: '●'; color: var(--red);    font-size: 1rem; }
+
+    /* Global floating tooltip */
+    #ai-tip {
+      display: none;
+      position: fixed;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 0.76rem;
+      line-height: 1.4;
+      width: 220px;
+      text-align: left;
+      z-index: 1000;
+      pointer-events: none;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.5);
+      white-space: normal;
+    }
+
     /* ---- Empty state ---- */
     .empty {
       text-align: center;
@@ -294,6 +334,7 @@
         <th onclick="sortTable(6)">Primera vez visto <span class="sort-arrow">↕</span></th>
         <th onclick="sortTable(7)">Último visto <span class="sort-arrow">↕</span></th>
         <th>Historial precio</th>
+        <th onclick="sortTable(9)" title="Valoración del precio por IA (verde=bueno, amarillo=normal, rojo=caro)">Valoración IA <span class="sort-arrow">↕</span></th>
       </tr>
     </thead>
     <tbody>
@@ -357,6 +398,13 @@
             <span style="color: var(--text-muted); font-size: 0.75rem;">—</span>
           {% endif %}
         </td>
+        <td data-ai="{{ car.ai_rating or '' }}" style="text-align:center;">
+          {% if car.ai_rating %}
+            <div class="ai-badge ai-{{ car.ai_rating }}" data-tip="{{ car.ai_justification or '' }}"></div>
+          {% else %}
+            <span style="color: var(--text-muted); font-size: 0.75rem;">—</span>
+          {% endif %}
+        </td>
       </tr>
     {% endfor %}
     </tbody>
@@ -405,6 +453,63 @@
     if (el) el.textContent = `Mostrando ${visible} vehículo${visible !== 1 ? 's' : ''}`;
   }
 
+  // ---- AI tooltip (global floating, avoids overflow clipping) ----
+  const aiTip = document.createElement('div');
+  aiTip.id = 'ai-tip';
+  document.body.appendChild(aiTip);
+
+  let tipPinned = false; // true when shown via click (mobile)
+
+  function showTip(badge) {
+    const text = badge.dataset.tip;
+    if (!text) return;
+    aiTip.textContent = text;
+    aiTip.style.display = 'block';
+    placeTip(badge);
+  }
+
+  function placeTip(badge) {
+    const r = badge.getBoundingClientRect();
+    const TW = 220;
+    const TH = aiTip.offsetHeight;
+    const margin = 8;
+
+    // Horizontal: center on badge, clamp to viewport
+    let left = r.left + r.width / 2 - TW / 2;
+    if (left + TW > window.innerWidth - margin) left = window.innerWidth - TW - margin;
+    if (left < margin) left = margin;
+
+    // Vertical: prefer above, fall back to below
+    let top = r.top - TH - margin;
+    if (top < margin) top = r.bottom + margin;
+
+    aiTip.style.left = left + 'px';
+    aiTip.style.top  = top  + 'px';
+  }
+
+  function hideTip() {
+    aiTip.style.display = 'none';
+    tipPinned = false;
+  }
+
+  // Desktop: hover
+  document.querySelectorAll('.ai-badge').forEach(b => {
+    b.addEventListener('mouseenter', () => { if (!tipPinned) showTip(b); });
+    b.addEventListener('mouseleave', () => { if (!tipPinned) hideTip(); });
+    // Mobile / click: pin/unpin
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (tipPinned && aiTip.style.display !== 'none') {
+        hideTip();
+      } else {
+        tipPinned = true;
+        showTip(b);
+      }
+    });
+  });
+
+  document.addEventListener('click', () => { if (tipPinned) hideTip(); });
+
   // ---- History toggle ----
   function toggleHistory(btn) {
     const panel = btn.nextElementSibling;
@@ -426,14 +531,23 @@
     if (sortCol === col) sortAsc = !sortAsc;
     else { sortCol = col; sortAsc = true; }
 
+    const aiOrder = { green: 3, yellow: 2, red: 1, '': 0 };
     rows.sort((a, b) => {
-      const aText = a.cells[col]?.innerText.trim() || '';
-      const bText = b.cells[col]?.innerText.trim() || '';
-      const aNum = parseFloat(aText.replace(/[^\d.-]/g, ''));
-      const bNum = parseFloat(bText.replace(/[^\d.-]/g, ''));
-      let cmp = isNaN(aNum) || isNaN(bNum)
-        ? aText.localeCompare(bText, 'es')
-        : aNum - bNum;
+      let cmp;
+      if (col === 9) {
+        // Sort AI column by rating quality
+        const aVal = aiOrder[a.cells[col]?.dataset.ai || ''] ?? 0;
+        const bVal = aiOrder[b.cells[col]?.dataset.ai || ''] ?? 0;
+        cmp = aVal - bVal;
+      } else {
+        const aText = a.cells[col]?.innerText.trim() || '';
+        const bText = b.cells[col]?.innerText.trim() || '';
+        const aNum = parseFloat(aText.replace(/[^\d.-]/g, ''));
+        const bNum = parseFloat(bText.replace(/[^\d.-]/g, ''));
+        cmp = isNaN(aNum) || isNaN(bNum)
+          ? aText.localeCompare(bText, 'es')
+          : aNum - bNum;
+      }
       return sortAsc ? cmp : -cmp;
     });
 

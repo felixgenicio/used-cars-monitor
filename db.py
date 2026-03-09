@@ -61,6 +61,16 @@ def init_db():
             CREATE INDEX IF NOT EXISTS idx_price_car_id ON price_history(car_id);
             CREATE INDEX IF NOT EXISTS idx_cars_active ON cars(active);
         """)
+        # Migrate: add AI rating columns if they don't exist yet
+        for col, definition in [
+            ("ai_rating", "TEXT"),
+            ("ai_justification", "TEXT"),
+            ("ai_rated_price", "INTEGER"),
+        ]:
+            try:
+                conn.execute(f"ALTER TABLE cars ADD COLUMN {col} {definition}")
+            except Exception:
+                pass  # column already exists
 
 
 def now_iso():
@@ -180,6 +190,18 @@ def get_all_cars() -> list[dict]:
             result.append(car_dict)
 
     return result
+
+
+def save_car_rating(car_id: str, rating: str, justification: str, price: int | None):
+    """Persist the AI rating for a car."""
+    init_db()
+    with get_connection() as conn:
+        conn.execute(
+            """UPDATE cars
+               SET ai_rating=?, ai_justification=?, ai_rated_price=?
+               WHERE id=?""",
+            (rating, justification, price, car_id),
+        )
 
 
 def get_stats() -> dict:

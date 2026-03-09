@@ -10,6 +10,7 @@ from datetime import datetime, timezone
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 import db
+from ai_rating import rate_cars_if_needed
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,9 @@ def generate(output_dir: str | None = None):
 
     cars = db.get_all_cars()
     stats = db.get_stats()
+
+    # AI rating (skipped if OPENAI_API_KEY is not set)
+    rate_cars_if_needed(cars)
 
     # Enrich cars with display helpers
     for car in cars:
