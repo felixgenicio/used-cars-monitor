@@ -71,7 +71,64 @@ En la primera ejecución se recomienda usar `--debug`. Esto guarda todas las res
 
 El cron se ejecuta a las 08:00, 14:00 y 20:00. Los logs se guardan en `logs/`.
 
-Para ver el cron actual:
+### Configuración automática
+
+`setup.sh` añade el cron automáticamente. Para comprobarlo:
+
 ```bash
 crontab -l
+```
+
+Deberías ver una línea similar a:
+
+```
+0 8,14,20 * * * /ruta/al/proyecto/venv/bin/python /ruta/al/proyecto/run.py >> /ruta/al/proyecto/logs/cron.log 2>&1
+```
+
+### Configuración manual
+
+Si prefieres configurarlo a mano, ejecuta `crontab -e` y añade:
+
+```
+# Monitor de coches — 3 veces al día (08:00, 14:00, 20:00)
+0 8,14,20 * * * /ruta/al/proyecto/venv/bin/python /ruta/al/proyecto/run.py >> /ruta/al/proyecto/logs/cron.log 2>&1
+```
+
+Sustituye `/ruta/al/proyecto` por la ruta absoluta real, por ejemplo `/home/usuario/used-cars-monitor`.
+
+Para obtenerla:
+
+```bash
+pwd  # ejecutar desde el directorio del proyecto
+```
+
+### Cambiar el horario
+
+La sintaxis cron es `minuto hora día mes día_semana`. Algunos ejemplos:
+
+```
+# Cada 8 horas (00:00, 08:00, 16:00)
+0 0,8,16 * * *
+
+# Cada 6 horas
+0 */6 * * *
+
+# Solo en días laborables a las 9:00, 13:00 y 19:00
+0 9,13,19 * * 1-5
+```
+
+### Verificar que el cron funciona
+
+```bash
+# Ver los últimos logs del cron
+tail -f logs/cron.log
+
+# Ver el log del día de hoy
+tail -f logs/run_$(date +%Y%m%d).log
+```
+
+### Eliminar el cron
+
+```bash
+crontab -e  # borrar la línea correspondiente
 ```
