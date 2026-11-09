@@ -7,7 +7,7 @@ Herramienta que rastrea anuncios de coches de segunda mano y genera una página 
 - Scraping con Playwright (soporta páginas JavaScript/Next.js)
 - Historial de precios por vehículo
 - Registro de cuándo apareció y desapareció cada anuncio
-- Valoración IA del precio (verde/amarillo/rojo) con justificación vía OpenAI (`gpt-4o-search-preview`, con búsqueda de precios reales actuales)
+- Valoración IA del precio (verde/amarillo/rojo) con justificación vía OpenRouter (`perplexity/sonar` por defecto, con búsqueda web de precios reales actuales)
 - Página HTML estática con filtros y ordenación
 - Cron job (3 veces al día)
 
@@ -31,10 +31,11 @@ Edita `.env`:
 
 ```
 TARGET_URL=https://...   # URL de la página a monitorear
-OPENAI_API_KEY=sk-...    # Opcional: para la valoración IA de precios
+OPENROUTER_API_KEY=sk-or-v1-...  # Opcional: para la valoración IA de precios
+# OPENROUTER_MODEL=perplexity/sonar  # Opcional: modelo con búsqueda web
 ```
 
-Si no se configura `OPENAI_API_KEY`, el scraper funciona con normalidad pero sin la columna de valoración.
+Si no se configura `OPENROUTER_API_KEY`, el scraper funciona con normalidad pero sin la columna de valoración.
 
 ## Uso
 
@@ -62,7 +63,7 @@ La página generada se guarda en `output/index.html`.
 ├── scraper.py      # Scraper con Playwright
 ├── db.py           # Operaciones SQLite
 ├── generate.py     # Generador de página HTML
-├── ai_rating.py    # Valoración IA de precios via OpenAI
+├── ai_rating.py    # Valoración IA de precios vía OpenRouter
 ├── templates/
 │   └── index.html  # Plantilla Jinja2
 ├── setup.sh        # Script de instalación y configuración de cron

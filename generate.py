@@ -58,7 +58,7 @@ def generate(output_dir: str | None = None, rerate: bool = False):
     cars = db.get_all_cars()
     stats = db.get_stats()
 
-    # AI rating (skipped if OPENAI_API_KEY is not set)
+    # AI rating (skipped if OPENROUTER_API_KEY is not set)
     rate_cars_if_needed(cars, force=rerate)
 
     # Base URL for building absolute links

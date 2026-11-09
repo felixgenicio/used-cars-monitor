@@ -1,30 +1,34 @@
 """
 AI-powered price rating for used car listings.
-Calls OpenAI to assess whether a car's price is good, fair, or expensive.
+Calls an LLM with web search (via OpenRouter) to assess whether a car's price is good, fair, or expensive.
 Results are cached in the DB keyed by (car_id, price) to avoid redundant calls.
 """
 
 import json
 import logging
 import os
+import re
+
+OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1"
+DEFAULT_MODEL = "perplexity/sonar"
 
 logger = logging.getLogger(__name__)
 
 
 def rate_car(car: dict) -> tuple[str | None, str | None]:
     """
-    Ask OpenAI to rate the car's price.
+    Ask the model (OpenRouter, default perplexity/sonar) to rate the car's price.
     Returns (rating, justification) where rating is 'green', 'yellow', or 'red',
     or (None, None) if the API key is missing or the call fails.
     """
-    api_key = os.getenv("OPENAI_API_KEY")
+    api_key = os.getenv("OPENROUTER_API_KEY")
     if not api_key:
-        logger.warning("OPENAI_API_KEY not set — skipping AI rating")
+        logger.warning("OPENROUTER_API_KEY not set — skipping AI rating")
         return None, None
 
     try:
         from openai import OpenAI
-        client = OpenAI(api_key=api_key)
+        client = OpenAI(api_key=api_key, base_url=OPENROUTER_BASE_URL, timeout=120)
     except ImportError:
         logger.error("openai package not installed — run: pip install openai")
         return None, None
@@ -53,18 +57,19 @@ def rate_car(car: dict) -> tuple[str | None, str | None]:
 
     try:
         response = client.chat.completions.create(
-            model="gpt-4o-search-preview",
+            model=os.getenv("OPENROUTER_MODEL", DEFAULT_MODEL),
             messages=[{"role": "user", "content": prompt}],
         )
         content = response.choices[0].message.content
         # Extract JSON block from the response (model may wrap it in markdown)
-        import re
         json_match = re.search(r'\{[^{}]+\}', content, re.DOTALL)
         if not json_match:
             raise ValueError(f"No JSON found in response: {content!r}")
         data = json.loads(json_match.group())
         rating = data.get("rating", "yellow")
         justification = data.get("justification", "")
+        # Strip citation markers like [1][2] added by search models
+        justification = re.sub(r"\s*\[\d+\]", "", justification).strip()
 
         if rating not in ("green", "yellow", "red"):
             rating = "yellow"
@@ -72,7 +77,7 @@ def rate_car(car: dict) -> tuple[str | None, str | None]:
         return rating, justification
 
     except Exception as exc:
-        logger.error(f"OpenAI API error for car {car.get('id')}: {exc}")
+        logger.error(f"AI rating error for car {car.get('id')}: {exc}")
         return None, None
 
 
