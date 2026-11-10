@@ -361,7 +361,7 @@
             <span class="badge badge-inactive">Vendido / Eliminado</span>
           {% endif %}
         </td>
-        <td>
+        <td data-sort="{{ car.current_price if car.current_price is not none else '' }}">
           <div class="price-main">{{ car.display_price }}</div>
           {% if car.price_delta %}
             {% if '-' in car.price_delta %}
@@ -371,11 +371,11 @@
             {% endif %}
           {% endif %}
         </td>
-        <td>{{ car.display_km }}</td>
-        <td>{{ car.year or '—' }}</td>
+        <td data-sort="{{ car.km if car.km is not none else '' }}">{{ car.display_km }}</td>
+        <td data-sort="{{ car.year or '' }}">{{ car.year or '—' }}</td>
         <td>{{ car.fuel | capitalize if car.fuel else '—' }}</td>
-        <td>{{ car.display_first_seen }}</td>
-        <td>{{ car.display_last_seen }}</td>
+        <td data-sort="{{ car.first_seen or '' }}">{{ car.display_first_seen }}</td>
+        <td data-sort="{{ car.last_seen or '' }}">{{ car.display_last_seen }}</td>
         <td>
           {% set history = car.price_history %}
           {% if history | length > 1 %}
@@ -539,6 +539,12 @@
         const aVal = aiOrder[a.cells[col]?.dataset.ai || ''] ?? 0;
         const bVal = aiOrder[b.cells[col]?.dataset.ai || ''] ?? 0;
         cmp = aVal - bVal;
+      } else if (a.cells[col]?.dataset.sort !== undefined) {
+        // Raw value from the generator (number or ISO date); empty values always last
+        const aRaw = a.cells[col].dataset.sort, bRaw = b.cells[col]?.dataset.sort ?? '';
+        if (aRaw === '' || bRaw === '') return (aRaw === '') - (bRaw === '');
+        const aNum = Number(aRaw), bNum = Number(bRaw);
+        cmp = isNaN(aNum) || isNaN(bNum) ? aRaw.localeCompare(bRaw) : aNum - bNum;
       } else {
         const aText = a.cells[col]?.innerText.trim() || '';
         const bText = b.cells[col]?.innerText.trim() || '';
