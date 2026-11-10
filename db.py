@@ -172,7 +172,9 @@ def get_all_cars() -> list[dict]:
     init_db()
     with get_connection() as conn:
         cars = conn.execute(
-            "SELECT * FROM cars ORDER BY active DESC, first_seen DESC"
+            """SELECT * FROM cars ORDER BY active DESC,
+                      CASE WHEN active=1 THEN first_seen END DESC,
+                      last_seen DESC"""
         ).fetchall()
 
         result = []
